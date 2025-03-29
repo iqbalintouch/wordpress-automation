@@ -1,85 +1,96 @@
-﻿# Project Documentation
-# WordPress Automation - Project Documentation
+﻿# WordPress Automation Deployment Guide
 
-## Project Overview
-This project automates the deployment of a WordPress application using AWS services such as CloudFormation, IAM, and Lambda. The automation ensures a streamlined and repeatable deployment process.
+## 1️⃣ Introduction
+This guide covers the setup, deployment, and automation of a WordPress site using AWS services.
 
-## Prerequisites
-- AWS account with necessary permissions
-- Git installed on your local machine
-- Visual Studio Code or any text editor
-- A GitHub repository for version control
+## 2️⃣ Deployment Steps
+- Set up an EC2 instance for WordPress
+- Configure a MySQL database
+- Set up a reverse proxy (if applicable)
+- Automate backups
 
-## Project Setup
+## 3️⃣ Configuring Business Hours for Dev Instance (Using AWS EventBridge)
+Instead of AWS Instance Scheduler, we'll use **AWS EventBridge** to start and stop the development instance at specific times.
 
-### 1. Clone the Repository
-```sh
-$ git clone https://github.com/iqbalintouch/wordpress-automation.git
-$ cd wordpress-automation
-```
+### 🔹 Step 3.1: Create a Rule to Start the Instance at 9 AM
+1. **Open AWS EventBridge**  
+   - Go to **AWS Console → EventBridge**
+   - Click **Rules → Create Rule**
 
-### 2. Initialize Repository (If Not Already Done)
-```sh
-$ git init
-```
+2. **Configure the Rule**  
+   - **Rule Name:** `Start-Dev-Instance`  
+   - **Rule Type:** Schedule-based rule  
+   - **Schedule Pattern:** Choose **Cron expression**  
+   - **Enter this Cron Expression (for 9 AM every weekday):**  
+     ```
+     0 3 ? * MON-FRI *
+     ```  
+     *(AWS uses UTC, so 9 AM IST = 3:30 AM UTC, rounded to 3 AM UTC.)*
 
-### 3. Create Required Directories
-```sh
-$ mkdir cloudformation iam lambda screenshots
-```
+3. **Add Target (EC2 Instance)**  
+   - Click **Add Target → EC2**  
+   - Select **Action:** `StartInstances`  
+   - Select **Instance ID:** (Choose your Dev instance from the list)  
 
-### 4. Add Placeholder Files
-```sh
-$ touch screenshots/.gitkeep
-```
+4. **Create the Rule**  
+   - Click **Create** ✅
 
-### 5. Stage and Commit Changes
-```sh
-$ git add documentation.md screenshots/.gitkeep
-$ git commit -m "Added documentation file and screenshots folder"
-```
+### 🔹 Step 3.2: Create a Rule to Stop the Instance at 6 PM
+1. **Open AWS EventBridge**
+   - Go to **AWS Console → EventBridge**
+   - Click **Rules → Create Rule**
 
-### 6. Push Changes to Remote Repository
-```sh
-$ git push origin main
-```
-**Issue Encountered:**
-- The push was rejected due to remote changes.
-- Solution: Perform a rebase before pushing.
+2. **Configure the Rule**
+   - **Rule Name:** `Stop-Dev-Instance`
+   - **Rule Type:** Schedule-based rule
+   - **Schedule Pattern:** Choose **Cron expression**
+   - **Enter this Cron Expression (for 6 PM every weekday):**
+     ```
+     30 12 ? * MON-FRI *
+     ```
+     *(AWS uses UTC, so 6 PM IST = 12:30 PM UTC, rounded to 12 PM UTC.)*
 
-### 7. Resolve Git Push Conflict
-```sh
-$ git pull --rebase origin main
-```
-**Conflict Resolved:**
-- The `screenshots` folder had a conflict and was renamed to `screenshots~HEAD`.
-- Manually fixed the issue, re-added the folder, and continued rebase.
+3. **Add Target (EC2 Instance)**
+   - Click **Add Target → EC2**
+   - Select **Action:** `StopInstances`
+   - Select **Instance ID:** (Choose your Dev instance from the list)
 
-```sh
-$ git add documentation.md screenshots/.gitkeep
-$ git rebase --continue
-```
+4. **Create the Rule**
+   - Click **Create** ✅
 
-### 8. Add a Screenshot Document
-After manually placing `setup_screenshots.docx` under `screenshots/`:
-```sh
-$ git status
-```
-**Issue:** File was untracked due to incorrect naming (`setup_screenshots.docx.docx`).
-- Renamed the file correctly.
+### 🔹 Step 3.3: Test the Setup
+- Wait until **9 AM or 6 PM** to see if the instance starts/stops automatically.
+- Manually trigger the rule: **EventBridge → Rules → Actions → Simulate Run**
 
-```sh
-$ git add screenshots/setup_screenshots.docx
-$ git commit -m "Added setup screenshots document"
-$ git push origin main
-```
+✅ DONE! Your Dev WordPress instance will now automatically start at **9 AM** and stop at **6 PM** on weekdays. 🚀
 
-## Conclusion
-This project automates WordPress deployment using AWS, version-controlled through GitHub. The setup ensures a structured, conflict-free workflow using Git best practices.
+## 4️⃣ Setting Up Monitoring with Route 53
 
----
+### 🔹 Step 4.1: Create a Health Check
+1. **Open AWS Route 53**
+   - Go to **AWS Console → Route 53 → Health Checks**
+   - Click **Create Health Check**
 
-### Next Steps
-- Verify CloudFormation templates.
-- Implement Lambda automation scripts.
-- Test end-to-end deployment.
+2. **Configure Health Check**
+   - **Name:** `WordPress-Health-Check`
+   - **What to Monitor?** Select `Endpoint`
+   - **Protocol:** HTTP or HTTPS (depending on your site)
+   - **Domain Name or IP Address:** Enter your website's URL or EC2 instance IP
+   - **Request Interval:** 30 seconds
+   - **Failure Threshold:** 3
+
+3. **Click Create** ✅
+
+### 🔹 Step 4.2: Set Up DNS Failover (Optional)
+If you want automatic failover to another instance:
+1. **Go to Route 53 → Hosted Zones**
+2. Select your domain name
+3. Click **Create Record**
+4. **Enable Failover Routing Policy**
+5. Choose **Primary** for your main instance
+6. Choose **Secondary** for your backup instance
+
+✅ DONE! Route 53 will now monitor your site and provide failover if needed. 🚀
+
+## 5️⃣ Conclusion
+With this setup, your WordPress site is now **automated, scheduled, and monitored**, ensuring smooth operations and minimal manual intervention.
